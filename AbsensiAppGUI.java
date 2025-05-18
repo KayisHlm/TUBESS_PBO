@@ -116,11 +116,59 @@ class LemburService {
     }
 }
 
+
+// === Model Cuti ===
+class Cuti {
+    String userId, tanggalMulai, tanggalBerakhir, jenisCuti;
+    String status; // "menunggu", "setuju", "tolak"
+
+    public Cuti(String userId, String tanggalMulai, String tanggalBerakhir, String jenisCuti, String statuString) {
+        this.userId = userId;
+        this.tanggalMulai= tanggalMulai;
+        this.tanggalBerakhir = tanggalBerakhir;
+        this.status = "menunggu";
+        this.jenisCuti = jenisCuti;
+    }
+
+    public String toString() {
+        return (userId + " | "+ "Jenis Cuti: " + jenisCuti  + " | " + "Tanggal Mulai: "+ tanggalMulai + " | " + "Tanggal Berakhir: " + tanggalBerakhir + "|"+ "Status:" + status);
+    }
+}
+
+// === Service Cuti ===
+class CutiService {
+    java.util.List<Cuti> daftarCuti = new ArrayList<>();
+
+    void tambahCuti(Cuti c) {
+        daftarCuti.add(c);
+    }
+
+    java.util.List<Cuti> getSemua() {
+        return daftarCuti;
+    }
+
+    java.util.List<Cuti> getByUser(String userId) {
+        java.util.List<Cuti> hasil = new ArrayList<>();
+        for (Cuti c : daftarCuti) {
+            if (c.userId.equals(userId)) {
+                hasil.add(c);
+            }
+        }
+        return hasil;
+    }
+
+    void ubahStatus(Cuti cuti, String statusBaru) {
+        cuti.status = statusBaru;
+    }
+}
+
 // === Main Application GUI ===
 public class AbsensiAppGUI {
     static AbsensiService service = new AbsensiService();
     static LemburService lemburService = new LemburService();
+    static CutiService cutiService = new CutiService();
     static Map<String, User> users = new HashMap<>();
+    static Map<String, String> choices= new HashMap<>();
     static User currentUser;
     static DateTimeFormatter dateFmt = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
@@ -128,6 +176,12 @@ public class AbsensiAppGUI {
         users.put("admin", new User("A01", "Admin", "admin"));
         users.put("budi", new User("K01", "Budi", "karyawan"));
         users.put("siti", new User("K02", "Siti", "karyawan"));
+
+        choices.put("Annual", "Annual Leave");
+        choices.put("Sick", "Sick Leave");
+        choices.put("Maternity", "Maternity Leave");
+        choices.put("Emergency", "Emergency Leave");
+
 
         SwingUtilities.invokeLater(() -> loginForm());
     }
@@ -168,9 +222,11 @@ public class AbsensiAppGUI {
 
         JButton btnAbsensi = new JButton("Kelola Absensi");
         JButton btnLembur = new JButton("Kelola Lembur");
+        JButton btnCuti= new JButton("Kelola Cuti");
         JButton btnLogout = new JButton("Logout");
 
         frame.add(btnAbsensi);
+        frame.add(btnCuti);
         frame.add(btnLembur);
         frame.add(btnLogout);
 
@@ -178,6 +234,12 @@ public class AbsensiAppGUI {
             frame.dispose();
             showAbsensiPage(true);
         });
+
+        btnCuti.addActionListener(e -> {
+            frame.dispose();
+            showCutiPage(true); // admin
+        });
+
 
         btnLembur.addActionListener(e -> {
             frame.dispose();
@@ -633,6 +695,148 @@ public class AbsensiAppGUI {
             textArea.setText("");
             java.util.List<Lembur> daftar = isAdmin ? lemburService.getSemua()
                     : lemburService.getByUser(currentUser.id);
+            for (int i = 0; i < daftar.size(); i++) {
+                textArea.append("[" + i + "] " + daftar.get(i).toString() + "\n");
+            }
+        });
+
+        btnBack.addActionListener(e -> {
+            frame.dispose();
+            if (isAdmin) {
+                showAdminMenu();
+            } else {
+                showKaryawanMenu();
+            }
+        });
+
+        frame.setVisible(true);
+    }
+
+    // ============ CUTI PAGE (Admin dan Karyawan) ===============
+    static void showCutiPage(boolean isAdmin) {
+        JFrame frame = new JFrame("Cuti");
+        frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        frame.setSize(800, 600);
+        frame.setLayout(new BorderLayout());
+
+        JTextArea textArea = new JTextArea();
+        JScrollPane scroll = new JScrollPane(textArea);
+        JButton btnBack = new JButton("Back");
+
+        JPanel panelTop = new JPanel();
+
+        // Tombol Ajukan Cuti Karyawan
+        JButton btnAjukan = new JButton("Ajukan Cuti");
+        panelTop.add(btnAjukan);
+
+        Runnable refreshCutiList = () -> {
+            textArea.setText("");
+            java.util.List<Cuti> daftar = isAdmin ? cutiService.getSemua()
+                    : cutiService.getByUser(currentUser.id);
+            for (int i = 0; i < daftar.size(); i++) {
+                textArea.append("[" + i + "] " + daftar.get(i).toString() + "\n");
+            }
+        };
+
+        btnAjukan.addActionListener(e -> {
+            JTextField txtTglMulai = new JTextField();
+            JTextField txtTglBerakhir = new JTextField();
+            JTextField txtJenisCuti = new JTextField();
+            JComboBox<String> pilihan = new JComboBox<>();
+            for (String u : choices.values()) {
+                pilihan.addItem(u);
+            }
+
+            JTextField txtUser = new JTextField(); // hanya untuk admin
+            Object[] input;
+
+            if (isAdmin) {
+                JComboBox<String> comboUser = new JComboBox<>();
+                for (User u : users.values()) {
+                    if (u.role.equals("karyawan")) {
+                        comboUser.addItem(u.id + " - " + u.nama);
+                    }
+                }
+                
+
+                input = new Object[] {
+                        "Pilih Karyawan:", comboUser,
+                        "TanggalMulai (YYYY-MM-DD):", txtTglMulai,
+                        "TanggalBerakhir (YYYY-MM-DD):", txtTglBerakhir,
+                        "Jenis Cuti:", txtJenisCuti,
+                        "Status:", pilihan
+                };
+
+                int res = JOptionPane.showConfirmDialog(null, input, "Ajukan Cuti", JOptionPane.OK_CANCEL_OPTION);
+                if (res == JOptionPane.OK_OPTION) {                    
+                    String selected = (String) comboUser.getSelectedItem();
+                    String userId = selected.split(" - ")[0];
+
+                    cutiService.tambahCuti(new Cuti(userId, txtTglMulai.getText(), txtTglBerakhir.getText(), txtJenisCuti.getText(), pilihan.getSelectedItem().toString()));
+                    JOptionPane.showMessageDialog(null, "Pengajuan cuti berhasil!");
+                    refreshCutiList.run(); // update langsung
+                }
+            } else {
+                input = new Object[] {
+                        "TanggalMulai (YYYY-MM-DD):", txtTglMulai,
+                        "TanggalBerakhir(YYYY-MM-DD):", txtTglBerakhir,
+                        "Jenis Cuti:", txtJenisCuti,
+                        "Status:", pilihan
+                };
+            }
+
+            int res = JOptionPane.showConfirmDialog(null, input, "Ajukan Cuti", JOptionPane.OK_CANCEL_OPTION);
+            if (res == JOptionPane.OK_OPTION) {
+                String userId = isAdmin ? txtUser.getText() : currentUser.id;
+
+                cutiService.tambahCuti(new Cuti(userId, txtTglMulai.getText(),txtTglBerakhir.getText(), txtJenisCuti.getText(),pilihan.getSelectedItem().toString()));
+                JOptionPane.showMessageDialog(null, "Pengajuan cuti berhasil!");
+            }
+        });
+
+        // Tombol untuk menyetujui/menolak cuti (hanya admin)
+        if (isAdmin) {
+            JButton btnSetuju = new JButton("Setujui");
+            JButton btnTolak = new JButton("Tolak");
+            panelTop.add(btnSetuju);
+            panelTop.add(btnTolak);
+
+            btnSetuju.addActionListener(e -> {
+                String selectedId = JOptionPane.showInputDialog("Masukkan nomor cuti (0,1,2,..) untuk disetujui:");
+                try {
+                    int index = Integer.parseInt(selectedId);
+                    cutiService.ubahStatus(cutiService.getSemua().get(index), "setuju");
+                    JOptionPane.showMessageDialog(null, "Cuti disetujui!");
+                    refreshCutiList.run();
+                } catch (Exception ex) {
+                    JOptionPane.showMessageDialog(null, "Input tidak valid.");
+                }
+            });
+
+            btnTolak.addActionListener(e -> {
+                String selectedId = JOptionPane.showInputDialog("Masukkan nomor cuti (0,1,2,..) untuk ditolak:");
+                try {
+                    int index = Integer.parseInt(selectedId);
+                    cutiService.ubahStatus(cutiService.getSemua().get(index), "tolak");
+                    JOptionPane.showMessageDialog(null, "Cuti ditolak.");
+                    refreshCutiList.run();
+                } catch (Exception ex) {
+                    JOptionPane.showMessageDialog(null, "Input tidak valid.");
+                }
+            });
+        }
+
+        JButton btnLihat = new JButton("Lihat Data Cuti");
+        panelTop.add(btnLihat);
+        panelTop.add(btnBack);
+
+        frame.add(panelTop, BorderLayout.NORTH);
+        frame.add(scroll, BorderLayout.CENTER);
+
+        btnLihat.addActionListener(e -> {
+            textArea.setText("");
+            java.util.List<Cuti> daftar = isAdmin ? cutiService.getSemua()
+                    : cutiService.getByUser(currentUser.id);
             for (int i = 0; i < daftar.size(); i++) {
                 textArea.append("[" + i + "] " + daftar.get(i).toString() + "\n");
             }
